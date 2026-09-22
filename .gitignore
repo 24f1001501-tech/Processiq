@@ -11,9 +11,13 @@ venv/
 *.egg-info/
 .ipynb_checkpoints/
 
-# Data - raw data is downloadable from UCI, see README
+# Raw data is downloadable from UCI (see README) - not committed.
 data/raw/*.csv
-data/processed/*.parquet
+
+# The processed parquet IS committed: the deployed app needs it at runtime,
+# and at ~3.6 MB it is well within a sensible repo budget. It is fully
+# reproducible from the raw CSVs via `python src/clean_data.py`.
+!data/processed/turbine_clean.parquet
 
 # Outputs
 outputs/*.html

@@ -85,7 +85,7 @@ PROVIDERS = {
     ),
 }
 
-DEFAULT_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()
+DEFAULT_PROVIDER = (os.getenv("LLM_PROVIDER") or "groq").lower()
 
 
 @dataclass
@@ -102,13 +102,34 @@ class LLMResult:
         return self.text is not None
 
 
+def _read_secret(key: str) -> str | None:
+    """
+    Resolve a credential from the environment, then from Streamlit secrets.
+
+    Locally the key lives in .env. On Streamlit Community Cloud there is no
+    .env file - secrets are injected through st.secrets instead - so the
+    deployed app needs both paths. The import is inside the function because
+    this module is also used from plain CLI scripts where streamlit may not be
+    importable.
+    """
+    value = os.getenv(key)
+    if value:
+        return value
+    try:
+        import streamlit as st
+
+        return st.secrets.get(key)
+    except Exception:
+        return None
+
+
 class LLMClient:
     def __init__(self, provider: str | None = None):
         name = (provider or DEFAULT_PROVIDER).lower()
         if name not in PROVIDERS:
             raise ValueError(f"Unknown provider {name!r}. Options: {list(PROVIDERS)}")
         self.provider = PROVIDERS[name]
-        self.api_key = os.getenv(self.provider.env_key) if self.provider.needs_auth else None
+        self.api_key = _read_secret(self.provider.env_key) if self.provider.needs_auth else None
 
     @property
     def configured(self) -> bool:

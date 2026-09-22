@@ -126,9 +126,10 @@ with st.sidebar:
 
     st.divider()
     st.markdown(
-        '<div class="subtle">Built for the PwC AC Consulting application.<br>'
-        "Origin: manual screening of 120 process parameters to diagnose "
-        "gas-turbine heat-rate deviation during a refinery internship.</div>",
+        '<div class="subtle">Natural-language analytics over five years of '
+        "plant sensor history. Every figure on screen is computed "
+        "deterministically — the model explains results, it never produces "
+        "them.</div>",
         unsafe_allow_html=True,
     )
 
