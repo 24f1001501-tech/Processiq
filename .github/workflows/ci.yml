@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Rebuild the processed dataset from raw CSVs
+        # Proves the cleaning pipeline is reproducible rather than trusting the
+        # committed parquet.
+        run: python src/clean_data.py
+
+      - name: Verify analytical findings still hold
+        run: python src/analysis.py
+
+      - name: Run evaluation harness
+        # --rules-only exercises the deterministic path, so CI needs no API key
+        # and no network. It gates on fact accuracy being exactly 100%.
+        run: python eval/run_eval.py --rules-only
