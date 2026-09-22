@@ -73,13 +73,17 @@ def metric_card(value, label):
 
 
 def llm_status():
+    """Return (online, detail). Detail explains WHY when offline."""
     try:
+        from src import llm as llm_mod
+
         client = get_client()
         if client.configured:
             return True, f"{client.provider.name} · {client.provider.models[0]}"
-        return False, f"{client.provider.env_key} not set"
+        detail = llm_mod.LAST_SECRET_DIAGNOSTIC or f"{client.provider.env_key} not set"
+        return False, detail
     except Exception as e:
-        return False, str(e)
+        return False, f"{type(e).__name__}: {e}"
 
 
 # --------------------------------------------------------------------------

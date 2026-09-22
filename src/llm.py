@@ -102,6 +102,11 @@ class LLMResult:
         return self.text is not None
 
 
+# Populated by _read_secret so the UI can explain WHY a key was not found
+# rather than just reporting that it is missing.
+LAST_SECRET_DIAGNOSTIC: str | None = None
+
+
 def _read_secret(key: str) -> str | None:
     """
     Resolve a credential from the environment, then from Streamlit secrets.
@@ -111,16 +116,67 @@ def _read_secret(key: str) -> str | None:
     deployed app needs both paths. The import is inside the function because
     this module is also used from plain CLI scripts where streamlit may not be
     importable.
+
+    Failures here are recorded rather than swallowed. The most common cause is
+    a TOML syntax error in the Streamlit secrets box: values must be quoted
+    (KEY = "value"), and an unquoted value makes the whole file unparseable,
+    so every secret silently disappears at once.
     """
+    global LAST_SECRET_DIAGNOSTIC
+    LAST_SECRET_DIAGNOSTIC = None
+
     value = os.getenv(key)
-    if value:
-        return value
+    source = "environment/.env"
+
+    if not value:
+        value, source = _read_streamlit_secret(key)
+
+    if not value:
+        if LAST_SECRET_DIAGNOSTIC is None:
+            LAST_SECRET_DIAGNOSTIC = (
+                f"{key} was not found. On Streamlit Cloud set it in the secrets "
+                f'box as {key} = "gsk_..." (quotes are required). Locally put '
+                f"{key}=gsk_... in a .env file (no quotes, no spaces around =)."
+            )
+        return None
+
+    # A malformed value is worse than a missing one: it fails at call time with
+    # an opaque 401 instead of at startup. Validate whatever the source.
+    if key == "GROQ_API_KEY" and not str(value).startswith("gsk_"):
+        LAST_SECRET_DIAGNOSTIC = (
+            f"A value for {key} was found in {source}, but Groq keys begin "
+            "with 'gsk_' and this one does not. It is likely truncated, or the "
+            "wrong value was copied. Create a fresh key at "
+            "console.groq.com/keys."
+        )
+
+    return value
+
+
+def _read_streamlit_secret(key: str) -> tuple[str | None, str]:
+    """Look the key up in st.secrets, distinguishing 'absent' from 'broken'."""
+    global LAST_SECRET_DIAGNOSTIC
+
     try:
         import streamlit as st
+    except ImportError:
+        return None, ""
 
-        return st.secrets.get(key)
-    except Exception:
-        return None
+    try:
+        return st.secrets.get(key), "Streamlit secrets"
+    except Exception as e:
+        name = type(e).__name__
+        # No secrets file at all is the normal case when running locally with
+        # a .env - it is not an error worth alarming the user about.
+        if "NotFound" in name:
+            return None, ""
+        LAST_SECRET_DIAGNOSTIC = (
+            f"Streamlit secrets could not be parsed ({name}). This is almost "
+            "always a TOML syntax error: values must be quoted, as in "
+            f'{key} = "gsk_...". A single unquoted value invalidates the whole '
+            "secrets file, so every secret disappears at once."
+        )
+        return None, ""
 
 
 class LLMClient:
