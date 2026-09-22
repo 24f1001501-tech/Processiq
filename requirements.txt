@@ -1,10 +1,16 @@
-pandas>=3.0.3
-numpy>=2.5.0
-scikit-learn>=1.9.0
-duckdb>=1.5.5
-streamlit>=1.64.0
-plotly>=7.1.0
-pyarrow>=25.0.1
-python-dotenv>=1.2.2
-PyYAML>=6.0.3
-shap>=0.52.0
+# Floors rather than exact pins: the deployment target resolves to current
+# releases, and pinning to bleeding-edge local versions is a common cause of
+# build failures on hosted runners.
+
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+duckdb>=0.9
+pyarrow>=14.0
+
+# st.plotly_chart(width=...) replaced use_container_width in 1.49.
+streamlit>=1.50
+plotly>=5.18
+
+python-dotenv>=1.0
+PyYAML>=6.0
