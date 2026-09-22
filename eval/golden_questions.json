@@ -1,0 +1,126 @@
+{
+  "description": "Golden evaluation set for ProcessIQ. Each case asserts the tool the router should select and, where applicable, facts the computed result must contain. Ground truth comes from the verified analysis in src/analysis.py, not from model output.",
+  "tolerance_pct": 2.0,
+  "cases": [
+    {
+      "id": "driver_basic",
+      "question": "What actually drives turbine energy yield at this plant?",
+      "expect_tool": "rank_efficiency_drivers",
+      "expect_facts": { "top_driver": "TIT" }
+    },
+    {
+      "id": "driver_phrasing_affect",
+      "question": "Which parameters affect power output the most?",
+      "expect_tool": "rank_efficiency_drivers",
+      "expect_facts": { "top_driver": "TIT" }
+    },
+    {
+      "id": "driver_phrasing_important",
+      "question": "What is the most important variable for energy yield?",
+      "expect_tool": "rank_efficiency_drivers",
+      "expect_facts": { "top_driver": "TIT" }
+    },
+    {
+      "id": "driver_naive_mode",
+      "question": "Show me the naive driver ranking including load symptoms",
+      "expect_tool": "rank_efficiency_drivers",
+      "expect_facts": {}
+    },
+    {
+      "id": "compliance_exposure",
+      "question": "How exposed are we on NOx compliance?",
+      "expect_tool": "analyse_emissions_compliance",
+      "expect_facts": { "pollutant": "NOX", "limit_mg_m3": 70.0, "worst_year": 2013 }
+    },
+    {
+      "id": "compliance_breach_word",
+      "question": "How often do we breach the emissions limit?",
+      "expect_tool": "analyse_emissions_compliance",
+      "expect_facts": { "pollutant": "NOX" }
+    },
+    {
+      "id": "compliance_regulatory",
+      "question": "Are we within regulatory limits for nitrogen oxides?",
+      "expect_tool": "analyse_emissions_compliance",
+      "expect_facts": { "pollutant": "NOX" }
+    },
+    {
+      "id": "compliance_co",
+      "question": "What is our CO compliance position?",
+      "expect_tool": "analyse_emissions_compliance",
+      "expect_facts": { "pollutant": "CO", "limit_mg_m3": 20.0 }
+    },
+    {
+      "id": "compliance_year_filter",
+      "question": "How bad was NOx compliance in 2013?",
+      "expect_tool": "analyse_emissions_compliance",
+      "expect_facts": { "pollutant": "NOX" }
+    },
+    {
+      "id": "forecast_breach",
+      "question": "Are we on track to breach the NOx limit?",
+      "expect_tool": "forecast_emissions",
+      "expect_facts": { "pollutant": "NOX", "limit": 70.0 }
+    },
+    {
+      "id": "forecast_future",
+      "question": "What will emissions look like going forward?",
+      "expect_tool": "forecast_emissions",
+      "expect_facts": { "pollutant": "NOX" }
+    },
+    {
+      "id": "degradation_years",
+      "question": "Why did performance change between 2013 and 2014?",
+      "expect_tool": "diagnose_performance_change",
+      "expect_facts": { "from_year": 2013, "to_year": 2014, "largest_mover": "NOX" }
+    },
+    {
+      "id": "degradation_general",
+      "question": "Has the plant degraded over the five years?",
+      "expect_tool": "diagnose_performance_change",
+      "expect_facts": {}
+    },
+    {
+      "id": "degradation_what_happened",
+      "question": "What happened to the unit between 2011 and 2015?",
+      "expect_tool": "diagnose_performance_change",
+      "expect_facts": { "from_year": 2011, "to_year": 2015 }
+    },
+    {
+      "id": "ambient_basic",
+      "question": "Does ambient temperature really affect our output?",
+      "expect_tool": "ambient_effect_at_constant_load",
+      "expect_facts": { "ambient_penalty_pct": -2.57 }
+    },
+    {
+      "id": "ambient_weather",
+      "question": "How much output do we lose on hot days?",
+      "expect_tool": "ambient_effect_at_constant_load",
+      "expect_facts": { "ambient_penalty_pct": -2.57 }
+    },
+    {
+      "id": "ambient_seasonality",
+      "question": "Is there a seasonal effect on performance?",
+      "expect_tool": "ambient_effect_at_constant_load",
+      "expect_facts": {}
+    },
+    {
+      "id": "quality_trust",
+      "question": "Can I trust this data?",
+      "expect_tool": "data_quality_report",
+      "expect_facts": { "duplicates_removed": 7, "humidity_clipped": 478 }
+    },
+    {
+      "id": "quality_sensors",
+      "question": "Were there any sensor failures in this record?",
+      "expect_tool": "data_quality_report",
+      "expect_facts": { "stuck_sensor_rows": 126 }
+    },
+    {
+      "id": "quality_governance",
+      "question": "What cleaning decisions were made on this dataset?",
+      "expect_tool": "data_quality_report",
+      "expect_facts": {}
+    }
+  ]
+}

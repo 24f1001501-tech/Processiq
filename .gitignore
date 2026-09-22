@@ -1,0 +1,25 @@
+# Secrets - never commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Data - raw data is downloadable from UCI, see README
+data/raw/*.csv
+data/processed/*.parquet
+
+# Outputs
+outputs/*.html
+outputs/*.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json

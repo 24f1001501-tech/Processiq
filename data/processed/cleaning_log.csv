@@ -1,0 +1,12 @@
+step,detail,rows_affected
+load,Concatenated 5 yearly files,36733
+timestamp,Derived approximate timestamp from sequential operating hours (see docstring),36733
+clip_AH,"Relative humidity clipped to 100% (max observed was 100.20%, indicating sensor calibration drift)",478
+drop_duplicates,Dropped rows identical across all 11 sensor tags,7
+flag_stuck,AH held a constant value for >=24 consecutive readings,24
+flag_stuck,NOX held a constant value for >=24 consecutive readings,102
+flag_outlier,AFDP beyond 3.0x IQR fence,2
+flag_outlier,TAT beyond 3.0x IQR fence,1361
+flag_outlier,CO beyond 3.0x IQR fence,1014
+flag_outlier,NOX beyond 3.0x IQR fence,112
+feature_engineering,"Derived 8 features: thermal_spread, pressure_ratio, specific_yield, nox_utilisation, co_utilisation, nox_breach, co_breach, nox_co_ratio",36726

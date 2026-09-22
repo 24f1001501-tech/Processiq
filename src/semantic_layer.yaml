@@ -1,0 +1,241 @@
+# ProcessIQ Semantic Layer
+#
+# This file is what lets a language model reason about plant data without
+# hallucinating. Raw column names like "AFDP" or "TIT" mean nothing to an LLM;
+# this maps each tag to its physical meaning, units, operating envelope and
+# role in the process, so generated SQL and generated narrative are grounded.
+#
+# It is also the governance artifact: every assumption the system makes about
+# this plant is written down here in one reviewable place, rather than being
+# buried in prompts or code.
+
+dataset:
+  name: Combined-Cycle Gas Turbine - Sensor History
+  source: UCI Machine Learning Repository, Gas Turbine CO and NOx Emission Data Set
+  citation: "Kaya, H., Tufekci, P., Uzun, E. (2019). UCI ML Repository."
+  plant: Combined-cycle power plant, north-western Turkey
+  period: 2011-2015
+  resolution: hourly aggregate
+  rows: 36726
+  table: turbine
+
+  # The raw files carry no timestamp column and contain fewer rows than there
+  # are hours in a year, so wall-clock time is unrecoverable. We lay operating
+  # hours sequentially from 1 Jan of each year. Valid for ordering and
+  # within-year trends; NOT valid as true calendar dates.
+  timestamp_caveat: >
+    timestamp is synthesised from sequential operating hours, not measured.
+    Use it for ordering and trend analysis, never for calendar-date claims.
+
+columns:
+  AT:
+    name: Ambient Temperature
+    unit: "°C"
+    role: ambient
+    controllable: false
+    range: [-6.23, 37.10]
+    description: >
+      Outside air temperature. Higher ambient temperature lowers air density,
+      reducing compressor mass flow and therefore turbine output. The single
+      largest uncontrollable influence on plant capacity.
+
+  AP:
+    name: Ambient Pressure
+    unit: mbar
+    role: ambient
+    controllable: false
+    range: [985.85, 1036.60]
+    description: Barometric pressure. Minor influence on air density and mass flow.
+
+  AH:
+    name: Ambient Humidity
+    unit: "%"
+    role: ambient
+    controllable: false
+    range: [24.09, 100.0]
+    description: >
+      Relative humidity. Affects air density and NOx formation (water vapour
+      suppresses peak flame temperature).
+    data_quality_note: >
+      478 raw readings exceeded 100% RH, which is physically impossible and
+      indicates calibration drift. These were clipped to 100% and flagged in
+      the AH_was_clipped column.
+
+  AFDP:
+    name: Air Filter Differential Pressure
+    unit: mbar
+    role: equipment_condition
+    controllable: true
+    range: [2.09, 7.61]
+    description: >
+      Pressure drop across the inlet air filter. RISING AFDP means the filter
+      is fouling, which starves the compressor and costs output. Falling AFDP
+      usually means the filter was cleaned or replaced - a maintenance event.
+
+  GTEP:
+    name: Gas Turbine Exhaust Pressure
+    unit: mbar
+    role: load_symptom
+    controllable: false
+    range: [17.70, 40.72]
+    description: >
+      Exhaust back-pressure. Moves with unit load. NOT an independent driver of
+      output - correlates +0.958 with TEY because both track load.
+
+  TIT:
+    name: Turbine Inlet Temperature
+    unit: "°C"
+    role: control_setpoint
+    controllable: true
+    range: [1000.80, 1100.90]
+    description: >
+      Firing temperature at the turbine inlet. The primary operator lever:
+      higher TIT raises both efficiency and output, but also raises thermal NOx
+      formation exponentially and accelerates hot-gas-path component wear.
+      Verified as the dominant actionable driver of energy yield (93.7%
+      importance once load co-symptoms are excluded).
+
+  TAT:
+    name: Turbine After Temperature
+    unit: "°C"
+    role: load_symptom
+    controllable: false
+    range: [511.04, 550.61]
+    description: >
+      Exhaust temperature after the turbine. Inversely related to load. In a
+      combined-cycle plant this feeds the heat-recovery steam generator.
+
+  TEY:
+    name: Turbine Energy Yield
+    unit: MWh
+    role: target
+    controllable: false
+    range: [100.02, 179.50]
+    description: >
+      Hourly electrical energy output. The primary performance target. This is
+      the variable most analyses try to predict or explain.
+
+  CDP:
+    name: Compressor Discharge Pressure
+    unit: mbar
+    role: load_symptom
+    controllable: false
+    range: [9.85, 15.16]
+    description: >
+      Compressor outlet pressure. Correlates +0.987 with TEY. WARNING: using
+      CDP to "predict" TEY produces a 99.8% accurate but meaningless model -
+      it is a co-symptom of load, not a cause of output. Exclude it from any
+      driver analysis.
+
+  CO:
+    name: Carbon Monoxide Emissions
+    unit: "mg/m³"
+    role: emission
+    controllable: false
+    range: [0.0, 44.10]
+    compliance_threshold: 20.0
+    description: >
+      Product of incomplete combustion. Rises when flame temperature is too low
+      or combustion is unstable - typically at part load or during transients.
+      Inversely related to TIT (correlation -0.759).
+
+  NOX:
+    name: Nitrogen Oxides Emissions
+    unit: "mg/m³"
+    role: emission
+    controllable: false
+    range: [25.91, 119.91]
+    compliance_threshold: 70.0
+    description: >
+      Thermal NOx, formed at high flame temperature. The binding emissions
+      constraint at this plant: 28.8% of all operating hours exceed the
+      70 mg/m³ reference limit.
+    data_quality_note: >
+      A 102-hour window shows NOX frozen at a constant value - a stuck sensor
+      tag. Flagged in stuck_sensor_flag, retained but excludable.
+
+derived_columns:
+  thermal_spread:
+    formula: TIT - TAT
+    unit: "°C"
+    description: >
+      Temperature drop across the turbine. A narrowing spread at constant load
+      suggests degrading expansion efficiency.
+
+  pressure_ratio:
+    formula: CDP / (AP / 1000)
+    unit: ratio
+    description: Compression ratio proxy.
+
+  specific_yield:
+    formula: TEY / TIT
+    unit: MWh/°C
+    description: >
+      Energy produced per unit of firing temperature - a crude heat-rate proxy.
+      Falling specific yield at constant conditions indicates efficiency loss.
+
+  nox_utilisation:
+    formula: NOX / 70.0
+    unit: fraction of limit
+    description: 1.0 means exactly at the compliance limit; above 1.0 is a breach.
+
+  co_utilisation:
+    formula: CO / 20.0
+    unit: fraction of limit
+
+  nox_breach:
+    formula: NOX > 70.0
+    unit: boolean
+
+  co_breach:
+    formula: CO > 20.0
+    unit: boolean
+
+  nox_co_ratio:
+    formula: NOX / CO
+    unit: ratio
+    description: >
+      Compact combustion-tuning indicator. NOx and CO respond oppositely to
+      flame temperature, so this ratio summarises how a unit is tuned.
+
+quality_flags:
+  AH_was_clipped:
+    description: Humidity reading exceeded 100% and was clipped.
+  stuck_sensor_flag:
+    description: Row falls inside a window where some tag was frozen.
+  stuck_sensor_tags:
+    description: Semicolon-separated list of frozen tags for that row.
+  outlier_flag:
+    description: Row contains at least one value beyond a 3x IQR fence.
+  outlier_tags:
+    description: Semicolon-separated list of outlying tags.
+
+# Findings already verified against this data. The agent may state these as
+# established fact; anything else must be computed, not asserted.
+verified_findings:
+  - id: driver_ranking
+    finding: >
+      Turbine Inlet Temperature is the dominant actionable driver of energy
+      yield (93.7% importance), once load co-symptoms CDP/GTEP/TAT are
+      excluded. Ambient temperature is second at 5.1%.
+  - id: multicollinearity_trap
+    finding: >
+      A naive model including CDP reports CDP at 97.6% importance with
+      R2=0.998. This is load predicting load, not a causal driver. Any driver
+      analysis on this plant must exclude CDP, GTEP and TAT.
+  - id: ambient_penalty
+    finding: >
+      At constant load, output on hot hours is 2.57% below cold hours
+      (within-band AT-TEY correlation -0.773). The whole-dataset correlation of
+      -0.033 is misleading because load variation swamps the ambient effect.
+  - id: nox_step_change
+    finding: >
+      Between 2013 and 2014 mean NOx fell 13.4% (68.80 to 59.61 mg/m³) and the
+      share of hours in breach collapsed from 43.2% to 10.0%. CO fell 21.2%
+      over the same step and TEY rose, so this is not a NOx-CO tradeoff but an
+      across-the-board improvement consistent with a combustor or control
+      upgrade.
+  - id: compliance_exposure
+    finding: >
+      28.8% of all operating hours over 2011-2015 exceed the 70 mg/m³ NOx
+      reference limit. 2013 was the worst year at 43.2% of hours.
