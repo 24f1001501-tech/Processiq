@@ -126,10 +126,17 @@ with st.sidebar:
 
     st.divider()
     st.markdown(
-        '<div class="subtle">Natural-language analytics over five years of '
-        "plant sensor history. Every figure on screen is computed "
-        "deterministically — the model explains results, it never produces "
-        "them.</div>",
+        '<div class="subtle">'
+        "<b>Data provenance</b><br>"
+        "This application runs on the public UCI <i>Gas Turbine CO and NOx "
+        "Emission Data Set</i> — a combined-cycle plant in north-western "
+        "Turkey, 2011–2015. <b>It contains no proprietary or client data.</b>"
+        "<br><br>"
+        "The project originated from diagnosing a gas-turbine heat-rate "
+        "deviation by manually screening 120 process parameters during an "
+        "analytics internship at MRPL Refinery. That work informed the "
+        "approach; none of its data appears here."
+        "</div>",
         unsafe_allow_html=True,
     )
 

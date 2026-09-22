@@ -8,16 +8,28 @@ recommendation attached.
 
 ---
 
+> ### ⚠️ Data provenance
+>
+> This project runs entirely on the **public UCI Gas Turbine CO and NOx
+> Emission Data Set** — a combined-cycle power plant in north-western Turkey,
+> 2011–2015. **It contains no proprietary, confidential or client data.**
+>
+> The repository is named for the internship that *motivated* the work, not
+> for the source of the data. No MRPL data is used, reproduced or represented
+> anywhere in this project.
+
+---
+
 ## The problem this solves
 
-During an analytics internship at an operating refinery I diagnosed a
-gas-turbine heat-rate deviation by screening 120 process parameters by hand.
-The analysis was sound. It also took weeks, had to be repeated from scratch for
-the next question, and lived in a spreadsheet nobody else could interrogate.
+During an analytics internship at **MRPL Refinery** I diagnosed a gas-turbine
+heat-rate deviation by screening 120 process parameters by hand. The analysis
+was sound. It also took weeks, had to be repeated from scratch for the next
+question, and lived in a spreadsheet nobody else could interrogate.
 
-ProcessIQ is that workflow as a system: the parameter screen, the compliance
-check and the degradation attribution run in seconds, and anyone can ask for
-them in plain English.
+ProcessIQ is that workflow rebuilt as a system, on public data: the parameter
+screen, the compliance check and the degradation attribution run in seconds,
+and anyone can ask for them in plain English.
 
 ---
 
