@@ -102,81 +102,69 @@ class LLMResult:
         return self.text is not None
 
 
-# Populated by _read_secret so the UI can explain WHY a key was not found
-# rather than just reporting that it is missing.
-LAST_SECRET_DIAGNOSTIC: str | None = None
-
-
-def _read_secret(key: str) -> str | None:
+def _resolve_credential(key: str) -> tuple[str | None, str | None]:
     """
-    Resolve a credential from the environment, then from Streamlit secrets.
+    Find a credential and, if that fails, explain why.
 
-    Locally the key lives in .env. On Streamlit Community Cloud there is no
-    .env file - secrets are injected through st.secrets instead - so the
-    deployed app needs both paths. The import is inside the function because
-    this module is also used from plain CLI scripts where streamlit may not be
-    importable.
-
-    Failures here are recorded rather than swallowed. The most common cause is
-    a TOML syntax error in the Streamlit secrets box: values must be quoted
-    (KEY = "value"), and an unquoted value makes the whole file unparseable,
-    so every secret silently disappears at once.
+    Returns (value, diagnostic). Exactly one is meaningful: a found and
+    well-formed key yields (key, None); any failure yields (None, reason) or,
+    for a malformed value, (value, warning).
     """
-    global LAST_SECRET_DIAGNOSTIC
-    LAST_SECRET_DIAGNOSTIC = None
-
     value = os.getenv(key)
-    source = "environment/.env"
+    source = "the environment or .env file"
 
     if not value:
-        value, source = _read_streamlit_secret(key)
+        value, source, parse_error = _read_streamlit_secret(key)
+        if parse_error:
+            return None, parse_error
 
     if not value:
-        if LAST_SECRET_DIAGNOSTIC is None:
-            LAST_SECRET_DIAGNOSTIC = (
-                f"{key} was not found. On Streamlit Cloud set it in the secrets "
-                f'box as {key} = "gsk_..." (quotes are required). Locally put '
-                f"{key}=gsk_... in a .env file (no quotes, no spaces around =)."
-            )
-        return None
+        return None, (
+            f"{key} was not found. On Streamlit Cloud, set it in the secrets "
+            f'box as  {key} = "gsk_..."  — the quotes are required. Locally, '
+            f"put  {key}=gsk_...  in a .env file, with no quotes and no spaces "
+            "around the equals sign."
+        )
 
-    # A malformed value is worse than a missing one: it fails at call time with
-    # an opaque 401 instead of at startup. Validate whatever the source.
+    # A malformed value is worse than a missing one: it fails later with an
+    # opaque 401 instead of here, where the cause is obvious.
     if key == "GROQ_API_KEY" and not str(value).startswith("gsk_"):
-        LAST_SECRET_DIAGNOSTIC = (
+        return value, (
             f"A value for {key} was found in {source}, but Groq keys begin "
-            "with 'gsk_' and this one does not. It is likely truncated, or the "
-            "wrong value was copied. Create a fresh key at "
+            "with 'gsk_' and this one does not. It is probably truncated or "
+            "the wrong value was copied. Create a fresh key at "
             "console.groq.com/keys."
         )
 
-    return value
+    return value, None
 
 
-def _read_streamlit_secret(key: str) -> tuple[str | None, str]:
-    """Look the key up in st.secrets, distinguishing 'absent' from 'broken'."""
-    global LAST_SECRET_DIAGNOSTIC
+def _read_streamlit_secret(key: str) -> tuple[str | None, str, str | None]:
+    """
+    Look the key up in st.secrets.
 
+    Returns (value, source, parse_error). A missing secrets file is normal
+    when running locally against a .env and is not reported as an error; a
+    secrets file that exists but cannot be parsed is, because that failure
+    silently removes every secret at once.
+    """
     try:
         import streamlit as st
     except ImportError:
-        return None, ""
+        return None, "", None
 
     try:
-        return st.secrets.get(key), "Streamlit secrets"
+        return st.secrets.get(key), "Streamlit secrets", None
     except Exception as e:
         name = type(e).__name__
-        # No secrets file at all is the normal case when running locally with
-        # a .env - it is not an error worth alarming the user about.
         if "NotFound" in name:
-            return None, ""
-        LAST_SECRET_DIAGNOSTIC = (
+            return None, "", None
+        return None, "", (
             f"Streamlit secrets could not be parsed ({name}). This is almost "
             "always a TOML syntax error: values must be quoted, as in "
             f'{key} = "gsk_...". A single unquoted value invalidates the whole '
             "secrets file, so every secret disappears at once."
         )
-        return None, ""
 
 
 class LLMClient:
@@ -185,7 +173,18 @@ class LLMClient:
         if name not in PROVIDERS:
             raise ValueError(f"Unknown provider {name!r}. Options: {list(PROVIDERS)}")
         self.provider = PROVIDERS[name]
-        self.api_key = _read_secret(self.provider.env_key) if self.provider.needs_auth else None
+
+        # The diagnostic is carried on the instance rather than read back from
+        # a module global. Streamlit reruns a script without reimporting its
+        # modules, so a global can belong to an older version of this file than
+        # the caller - which surfaces as an AttributeError rather than the
+        # message it was meant to deliver.
+        self.diagnostic: str | None = None
+
+        if self.provider.needs_auth:
+            self.api_key, self.diagnostic = _resolve_credential(self.provider.env_key)
+        else:
+            self.api_key = None
 
     @property
     def configured(self) -> bool:

@@ -73,17 +73,32 @@ def metric_card(value, label):
 
 
 def llm_status():
-    """Return (online, detail). Detail explains WHY when offline."""
-    try:
-        from src import llm as llm_mod
+    """
+    Return (online, detail). Detail explains WHY when offline.
 
+    Every attribute access here is defensive. Streamlit reruns this script
+    without reimporting its modules, so during a redeploy this function can
+    briefly run against an older version of src.llm than it was written for.
+    Reading an attribute that version lacks would replace a helpful message
+    with an AttributeError, which is precisely the failure this function
+    exists to prevent.
+    """
+    try:
         client = get_client()
-        if client.configured:
-            return True, f"{client.provider.name} · {client.provider.models[0]}"
-        detail = llm_mod.LAST_SECRET_DIAGNOSTIC or f"{client.provider.env_key} not set"
-        return False, detail
     except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
+        return False, f"Could not initialise the client — {type(e).__name__}: {e}"
+
+    if getattr(client, "configured", False):
+        provider = getattr(client.provider, "name", "provider")
+        models = getattr(client.provider, "models", ())
+        return True, f"{provider} · {models[0] if models else 'unknown model'}"
+
+    diagnostic = getattr(client, "diagnostic", None)
+    if diagnostic:
+        return False, diagnostic
+
+    env_key = getattr(getattr(client, "provider", None), "env_key", "API key")
+    return False, f"{env_key} is not set."
 
 
 # --------------------------------------------------------------------------
