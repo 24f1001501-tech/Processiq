@@ -119,11 +119,30 @@ def _resolve_credential(key: str) -> tuple[str | None, str | None]:
             return None, parse_error
 
     if not value:
+        # Listing the key NAMES that are visible turns a dead end into an
+        # actionable message: it immediately distinguishes "nothing saved" from
+        # "saved under a different name" or "nested under a [section] header",
+        # which are otherwise indistinguishable from the outside. Names are not
+        # sensitive; values are never read here.
+        visible = _visible_secret_names()
+        if visible:
+            found = ", ".join(visible)
+            hint = (
+                f"{key} was not found, but these secrets ARE visible: {found}. "
+                "Check for a spelling difference, a trailing space, or a "
+                "[section] header above the key — anything under a section is "
+                "nested and will not be found at the top level."
+            )
+        else:
+            hint = (
+                f"{key} was not found, and no secrets are visible at all. "
+                "On Streamlit Cloud the secret may not have been saved, or the "
+                "app may need rebooting after saving."
+            )
         return None, (
-            f"{key} was not found. On Streamlit Cloud, set it in the secrets "
-            f'box as  {key} = "gsk_..."  — the quotes are required. Locally, '
-            f"put  {key}=gsk_...  in a .env file, with no quotes and no spaces "
-            "around the equals sign."
+            f"{hint} Expected format on Streamlit Cloud: "
+            f'{key} = "gsk_..."  (quotes required, no [section] header). '
+            f"Locally: {key}=gsk_...  in a .env file."
         )
 
     # A malformed value is worse than a missing one: it fails later with an
@@ -137,6 +156,27 @@ def _resolve_credential(key: str) -> tuple[str | None, str | None]:
         )
 
     return value, None
+
+
+def _visible_secret_names() -> list[str]:
+    """
+    Names (never values) of secrets the app can currently see.
+
+    A nested key is reported as "section.key" so a stray [section] header is
+    obvious from the message alone.
+    """
+    try:
+        import streamlit as st
+
+        names: list[str] = []
+        for k, v in st.secrets.items():
+            if hasattr(v, "items"):
+                names.extend(f"{k}.{sub}" for sub in v.keys())
+            else:
+                names.append(str(k))
+        return sorted(names)
+    except Exception:
+        return []
 
 
 def _read_streamlit_secret(key: str) -> tuple[str | None, str, str | None]:
